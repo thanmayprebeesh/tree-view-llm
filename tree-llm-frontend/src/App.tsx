@@ -10,6 +10,8 @@ import "@xyflow/react/dist/style.css";
 import { api } from "./api";
 import { layoutTree } from "./layout";
 import { TreeNodeCard } from "./TreeNodeCard";
+import { NodeDetailView } from "./NodeDetailView";
+import type { TreeNode } from "./types";
 import "./index.css";
 
 const nodeTypes = { treeNode: TreeNodeCard };
@@ -22,6 +24,7 @@ export default function App() {
   const [branchPrompt, setBranchPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const flat = await api.getTree();
@@ -69,6 +72,30 @@ export default function App() {
     window.addEventListener("delete-node", handler);
     return () => window.removeEventListener("delete-node", handler);
   }, [refresh, pendingParentId]);
+
+  // Same bridge pattern for expanding a node into the detail view.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      setExpandedNodeId(id);
+    };
+    window.addEventListener("expand-node", handler);
+    return () => window.removeEventListener("expand-node", handler);
+  }, []);
+
+  // The expanded node is derived from treeNodes rather than duplicated in
+  // its own state, so it always reflects the latest fetch. If it's ever
+  // deleted (e.g. via the detail view's own Delete button), it'll simply
+  // stop matching after the next refresh() and the modal auto-closes.
+  const expandedNode: TreeNode | null = useMemo(() => {
+    if (!expandedNodeId) return null;
+    const match = treeNodes.find((n) => n.id === expandedNodeId);
+    return (match?.data as { node: TreeNode } | undefined)?.node ?? null;
+  }, [expandedNodeId, treeNodes]);
+
+  useEffect(() => {
+    if (expandedNodeId && !expandedNode) setExpandedNodeId(null);
+  }, [expandedNodeId, expandedNode]);
 
   const submitRoot = useCallback(async () => {
     if (!rootPrompt.trim()) return;
@@ -156,6 +183,10 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {expandedNode && (
+        <NodeDetailView node={expandedNode} onClose={() => setExpandedNodeId(null)} />
+      )}
     </div>
   );
 }
