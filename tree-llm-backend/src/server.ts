@@ -8,13 +8,15 @@ import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { db } from "./db.js";
 import { nodes } from "./schema.js";
-import { getAncestorChain, chainToMessages } from "./context.js";
+import { getAncestorChain, chainToMessages, getContextNodes, formatAdditionalContext } from "./context.js";
 import type { CreateNodeRequest, TreeNode } from "./types.js";
 
 const app = new Hono();
 app.use("*", cors()); // wide open for local dev — lock down before deploying anywhere real
 
-const DEFAULT_MODEL = "gemini-3.6-flash";
+// gemini-2.5-flash has a genuinely usable free tier — good for testing
+// the tree/branching mechanics without burning through a paid key.
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 function rowToTreeNode(row: typeof nodes.$inferSelect): TreeNode {
   return {
@@ -29,6 +31,9 @@ function rowToTreeNode(row: typeof nodes.$inferSelect): TreeNode {
       createdAt: row.createdAt,
       label: row.label ?? undefined,
     },
+    additionalContextNodeIds: row.additionalContextNodeIds
+      ? (JSON.parse(row.additionalContextNodeIds) as string[])
+      : undefined,
   };
 }
 
@@ -58,10 +63,23 @@ app.post("/nodes", async (c) => {
   const model = body.model ?? DEFAULT_MODEL;
 
   // 1. Assemble context: everything from root down to the parent we're
-  //    branching from, plus the new prompt.
+  //    branching from, plus any explicitly merged-in nodes from other
+  //    branches, plus the new prompt.
   const ancestorChain = await getAncestorChain(body.parentId);
   const messages = chainToMessages(ancestorChain);
-  messages.push({ role: "user", content: body.prompt });
+
+  const additionalContextNodeIds = body.additionalContextNodeIds ?? [];
+  const contextNodes = await getContextNodes(additionalContextNodeIds);
+  const prependedContext = formatAdditionalContext(contextNodes);
+
+  // Note: the model sees `prependedContext + body.prompt`, but only
+  // `body.prompt` gets stored as this node's `prompt` field below. If
+  // someone later branches off *this* node, getAncestorChain() will
+  // replay the stored prompt — not the merged-in context block — so
+  // the merge doesn't silently re-inject and compound on every
+  // downstream branch. If you want a future branch to see that merged
+  // context too, it needs to be re-selected explicitly.
+  messages.push({ role: "user", content: prependedContext + body.prompt });
 
   // 2. Call the model.
   const result = await generateText({
@@ -82,6 +100,8 @@ app.post("/nodes", async (c) => {
     promptTokens: result.usage?.promptTokens,
     completionTokens: result.usage?.completionTokens,
     createdAt,
+    additionalContextNodeIds:
+      additionalContextNodeIds.length > 0 ? JSON.stringify(additionalContextNodeIds) : null,
   });
 
   const treeNode: TreeNode = {
@@ -95,6 +115,8 @@ app.post("/nodes", async (c) => {
       completionTokens: result.usage?.completionTokens,
       createdAt,
     },
+    additionalContextNodeIds:
+      additionalContextNodeIds.length > 0 ? additionalContextNodeIds : undefined,
   };
 
   return c.json(treeNode, 201);

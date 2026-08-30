@@ -47,5 +47,30 @@ export function layoutTree(treeNodes: TreeNode[]): { nodes: Node[]; edges: Edge[
       target: n.id,
     }));
 
-  return { nodes, edges };
+  // Merged-context edges: drawn from each source node to the node that
+  // pulled it in, styled distinctly from tree edges (dashed, different
+  // color) so it's visually obvious this is a cross-branch reference,
+  // not part of the strict parent/child structure. Deliberately NOT
+  // added to the dagre graph above — dagre uses edges to rank/position
+  // nodes, and letting a cross-branch reference influence layout could
+  // pull unrelated branches toward each other or distort the tree
+  // shape. These are rendered purely on top of the tree-derived layout.
+  //
+  // A referenced id can point at a node that's since been deleted; we
+  // skip those rather than drawing an edge to nowhere.
+  const existingIds = new Set(treeNodes.map((n) => n.id));
+  const mergeEdges: Edge[] = treeNodes.flatMap((n) =>
+    (n.additionalContextNodeIds ?? [])
+      .filter((sourceId) => existingIds.has(sourceId))
+      .map((sourceId) => ({
+        id: `merge:${sourceId}->${n.id}`,
+        source: sourceId,
+        target: n.id,
+        type: "straight",
+        animated: false,
+        style: { stroke: "#a9c1ff", strokeWidth: 1.5, strokeDasharray: "4 4" },
+      }))
+  );
+
+  return { nodes, edges: [...edges, ...mergeEdges] };
 }

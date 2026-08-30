@@ -15,10 +15,12 @@ export interface TreeNode {
   prompt: string;
   response: string;
   metadata: NodeMetadata;
+  additionalContextNodeIds?: string[];
 }
 
 export interface CreateNodeRequest {
   parentId: string | null;
   prompt: string;
   model?: string;
+  additionalContextNodeIds?: string[];
 }

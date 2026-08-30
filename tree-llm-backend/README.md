@@ -21,6 +21,7 @@ npm run dev
 ```
 
 
+
 ### Switching providers
 
 Because everything routes through the AI SDK's unified `generateText`
@@ -42,9 +43,6 @@ Update `DEFAULT_MODEL` and the env var name in `.env` to match
 whichever provider you pick (`npm install @ai-sdk/anthropic` first).
 
 Server boots on `:3001` and creates `tree.db` automatically on first run.
-
-
-I'll work on multiple api provisions concurrently later
 
 ## API
 
@@ -68,22 +66,51 @@ Creates a new node: branches from `parentId` (or starts a fresh root if
 {
   "parentId": "abc123" | null,
   "prompt": "your message",
-  "model": "gemini-3.6-flash"   // optional, defaults to gemini-3.6-flash
+  "model": "gemini-3.6-flash",           // optional, defaults to gemini-3.6-flash
+  "additionalContextNodeIds": ["xyz789"]  // optional, see "Merging context" below
 }
 ```
 
 What happens on the server:
 1. Walks from `parentId` up to the root, collecting the ancestor chain (`context.ts`).
 2. Converts that chain into a flat message array (each ancestor contributes a user + assistant message).
-3. Appends the new prompt, calls the model.
-4. Persists the new node and returns it.
+3. If `additionalContextNodeIds` is set, fetches those specific nodes and prepends their prompt/response as a labeled reference block on the new prompt (see "Merging context" below).
+4. Calls the model.
+5. Persists the new node and returns it.
 
 This ancestor-walk **is the context-assembly policy** for the whole app
 right now: a branch always sees its full path from root, nothing more,
 nothing less. That's the one thing worth reading in `src/context.ts`
 before you change anything — every other feature (context pruning,
-cross-branch merging, manual ancestor selection) should be layered on
-top of that function, not tangled into the route handler.
+manual ancestor selection) should be layered on top of that function,
+not tangled into the route handler.
+
+### Merging context across branches
+
+By default, sibling branches are fully isolated — branching "backend"
+and "frontend" off the same root means neither sees the other's
+prompts/responses. That's deliberate: it's what keeps unrelated
+workstreams from polluting each other's context.
+
+Sometimes you *want* one branch to see another's output — e.g. the
+backend branch needs to know what API shape the frontend branch
+settled on. That's what `additionalContextNodeIds` is for: pass the
+id(s) of specific node(s) from anywhere in the tree, and their
+prompt/response get pulled in as a clearly labeled reference block
+prepended to the new prompt (see `formatAdditionalContext` in
+`context.ts`) — not spliced into the message array as if the model
+said it itself, which would misrepresent the conversation history.
+
+Two things worth knowing:
+- **Not recursive.** Merging in a node pulls in *only that node's* own
+  prompt/response — not its own ancestor chain. If you need earlier
+  context from that branch too, pick multiple nodes explicitly.
+- **Not persisted forward.** The merged content is only present in the
+  actual model call for the node being created. The node's own stored
+  `prompt` field stays exactly what you typed — so if someone later
+  branches off *that* node, they don't inherit the merged-in context
+  automatically. It has to be re-selected each time it's needed. This
+  avoids silent, compounding context bloat as merges chain together.
 
 ### `DELETE /nodes/:id`
 Deletes a single node. **Does not cascade** — children of a deleted
