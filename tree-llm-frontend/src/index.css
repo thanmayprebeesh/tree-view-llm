@@ -141,7 +141,7 @@ body {
   color: #cfd6e6;
 }
 
-.node-picker-chip button {
+.panel .node-picker-chip button {
   background: none;
   border: none;
   color: #9aa3b5;
@@ -151,7 +151,7 @@ body {
   padding: 0;
 }
 
-.node-picker-chip button:hover {
+.panel .node-picker-chip button:hover {
   color: #ff9d9d;
 }
 
@@ -166,26 +166,27 @@ body {
   color: #5c6478;
 }
 
-.node-picker-item {
+.node-picker-list .node-picker-item {
   display: block;
   width: 100%;
   text-align: left;
   background: transparent;
   border: none;
+  border-radius: 0;
   border-bottom: 1px solid #1c2029;
   padding: 8px;
   cursor: pointer;
 }
 
-.node-picker-item:hover {
+.node-picker-list .node-picker-item:hover {
   background: #1a1e28;
 }
 
-.node-picker-item-selected {
+.node-picker-list .node-picker-item-selected {
   background: #1c2740;
 }
 
-.node-picker-item-selected:hover {
+.node-picker-list .node-picker-item-selected:hover {
   background: #22304f;
 }
 
