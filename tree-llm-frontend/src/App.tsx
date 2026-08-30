@@ -223,7 +223,11 @@ export default function App() {
       </div>
 
       {expandedNode && (
-        <NodeDetailView node={expandedNode} onClose={() => setExpandedNodeId(null)} />
+        <NodeDetailView
+          node={expandedNode}
+          allNodes={allNodes}
+          onClose={() => setExpandedNodeId(null)}
+        />
       )}
     </div>
   );

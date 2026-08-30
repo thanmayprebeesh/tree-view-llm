@@ -34,8 +34,10 @@ project, on port 3001 by default).
   grow.
 - **`NodeDetailView.tsx`** — a modal showing a node's full prompt and
   response as rendered markdown (`react-markdown` + `remark-gfm`),
-  opened by clicking a node card. Has its own Branch/Delete actions,
-  using the same event bus.
+  opened by clicking a node card. If the node has merged-in context
+  (`additionalContextNodeIds`), the header shows a clickable chip per
+  source node — clicking one jumps straight to that node's own detail
+  view. Has its own Branch/Delete actions, using the same event bus.
 - **`NodePicker.tsx`** — a searchable, filterable list for selecting
   nodes to "merge" as extra context into a new branch. Filters
   client-side over prompt/response text; fine at the scale a local
