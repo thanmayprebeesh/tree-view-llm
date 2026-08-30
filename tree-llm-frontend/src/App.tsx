@@ -11,6 +11,7 @@ import { api } from "./api";
 import { layoutTree } from "./layout";
 import { TreeNodeCard } from "./TreeNodeCard";
 import { NodeDetailView } from "./NodeDetailView";
+import { NodePicker } from "./NodePicker";
 import type { TreeNode } from "./types";
 import "./index.css";
 
@@ -25,6 +26,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
+  // Ids selected in the "merge context from another branch" picker,
+  // for whichever branch prompt is currently pending. Cleared whenever
+  // the branch panel closes (cancel, submit, or switching target node).
+  const [mergeContextIds, setMergeContextIds] = useState<string[]>([]);
 
   const refresh = useCallback(async () => {
     const flat = await api.getTree();
@@ -43,6 +48,7 @@ export default function App() {
     const handler = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
       setPendingParentId(id);
+      setMergeContextIds([]); // fresh branch target, fresh picker
     };
     window.addEventListener("branch-node", handler);
     return () => window.removeEventListener("branch-node", handler);
@@ -83,6 +89,14 @@ export default function App() {
     return () => window.removeEventListener("expand-node", handler);
   }, []);
 
+  // Flat TreeNode list, unwrapped from React Flow's Node<data> shape —
+  // used by NodePicker, which doesn't need or want React Flow's layout
+  // metadata.
+  const allNodes: TreeNode[] = useMemo(
+    () => treeNodes.map((n) => (n.data as { node: TreeNode }).node),
+    [treeNodes]
+  );
+
   // The expanded node is derived from treeNodes rather than duplicated in
   // its own state, so it always reflects the latest fetch. If it's ever
   // deleted (e.g. via the detail view's own Delete button), it'll simply
@@ -117,16 +131,21 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      await api.createNode({ parentId: pendingParentId, prompt: branchPrompt });
+      await api.createNode({
+        parentId: pendingParentId,
+        prompt: branchPrompt,
+        additionalContextNodeIds: mergeContextIds.length > 0 ? mergeContextIds : undefined,
+      });
       setBranchPrompt("");
       setPendingParentId(null);
+      setMergeContextIds([]);
       await refresh();
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
-  }, [pendingParentId, branchPrompt, refresh]);
+  }, [pendingParentId, branchPrompt, mergeContextIds, refresh]);
 
   const nodeTypesMemo = useMemo(() => nodeTypes, []);
 
@@ -172,11 +191,30 @@ export default function App() {
               placeholder="New prompt for this branch…"
               rows={3}
             />
+
+            <div className="merge-context-section">
+              <div className="merge-context-label">
+                Merge context from another branch (optional)
+              </div>
+              <NodePicker
+                allNodes={allNodes}
+                excludeIds={[pendingParentId]}
+                selectedIds={mergeContextIds}
+                onChange={setMergeContextIds}
+              />
+            </div>
+
             <div className="branch-actions">
               <button disabled={loading} onClick={submitBranch}>
                 {loading ? "Sending…" : "Send"}
               </button>
-              <button className="secondary" onClick={() => setPendingParentId(null)}>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setPendingParentId(null);
+                  setMergeContextIds([]);
+                }}
+              >
                 Cancel
               </button>
             </div>
