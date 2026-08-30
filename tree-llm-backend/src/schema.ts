@@ -14,4 +14,14 @@ export const nodes = sqliteTable("nodes", {
   completionTokens: integer("completion_tokens"),
   label: text("label"),
   createdAt: text("created_at").notNull(),
+  // JSON-encoded string[] of other node ids whose prompt/response should
+  // be pulled in as extra context when assembling this node's messages,
+  // on top of its normal ancestor chain. This is deliberately separate
+  // from parentId: the tree stays a strict single-parent structure (so
+  // sibling branches remain isolated by default), and merging context
+  // across branches is an explicit, opt-in list rather than changing
+  // the tree shape itself. Stored as JSON text since SQLite has no
+  // native array type — see context.ts for how it's read.
+  additionalContextNodeIds: text("additional_context_node_ids"),
 });
+

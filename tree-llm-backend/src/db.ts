@@ -18,8 +18,20 @@ sqlite.exec(`
     prompt_tokens INTEGER,
     completion_tokens INTEGER,
     label TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    additional_context_node_ids TEXT
   );
 `);
+
+// Defensive migration for anyone with an existing tree.db from before
+// additional_context_node_ids existed. CREATE TABLE IF NOT EXISTS above
+// only handles brand-new databases — it won't add a column to a table
+// that's already there. Swap all of this for real drizzle-kit
+// migrations once the schema needs to change more than occasionally.
+try {
+  sqlite.exec(`ALTER TABLE nodes ADD COLUMN additional_context_node_ids TEXT;`);
+} catch {
+  // Column already exists — fine, ignore.
+}
 
 export const db = drizzle(sqlite, { schema });
