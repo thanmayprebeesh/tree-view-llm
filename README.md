@@ -41,16 +41,17 @@ and appends your new prompt — see `backend/src/context.ts` for the
 one function that defines this behavior. Everything else in the app
 is built around that.
 
+Sibling branches are isolated by default — e.g. branching a project's
+"frontend" and "backend" work off the same root idea means neither
+sees the other's prompts/responses, so unrelated work doesn't pollute
+each other's context. When you deliberately want one branch to see
+another's output, the branch panel's "Merge context from another
+branch" picker lets you attach specific nodes (from anywhere in the
+tree) as extra, clearly-labeled reference material for that one
+prompt — see the backend README for exactly how that's assembled.
+
 ## Status
 
 Early / v1. No streaming, no auth, no cascade deletes, single local
 SQLite file — see each subproject's README for the full list of
 what's deliberately left out for now.
-
-## Note on API usage
-
-This project requires your own API key (Gemini, or another provider if you
-swap it in) and makes calls to that provider on your behalf. You are
-responsible for your own usage and any costs incurred under that
-provider's terms of service. This project is provided as-is with no
-warranty — see [LICENSE](./LICENSE).
